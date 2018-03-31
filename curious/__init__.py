@@ -2,6 +2,7 @@ import inspect
 import types
 import django.db.models
 from .graph import _valid_django_rel
+from .graph import traverse
 
 
 def deferred_to_real(objs):
@@ -10,6 +11,61 @@ def deferred_to_real(objs):
     return []
   model = deferred_model[0]
   return model.objects.filter(pk__in=[obj.pk for obj in objs])
+
+
+class CountObject(object):
+
+  def __init__(self, id):
+    try:
+      self.__value = int(id)
+    except:
+      self.__value = None
+
+  def __str__(self):
+    return '%s' % self.__value
+
+  @classmethod
+  def fetch(cls, ids):
+    return cls.query(ids)
+
+  @classmethod
+  def query(cls, ids):
+    objs = [cls(id) for id in ids]
+    return objs
+
+  @property
+  def value(self):
+    return self.__value
+
+  @property
+  def id(self):
+    return self.__value
+
+  @property
+  def pk(self):
+    return self.id
+
+  def fields(self):
+    return ['id', 'value']
+
+  def get(self, f):
+    if f == 'id':
+      return self.id
+    elif f == 'value':
+      return self.value
+    return None
+
+  @staticmethod
+  def count_wrapper(f):
+    def wrapped(objs, filters):
+      rels = traverse(objs, f, filters=filters)
+      counts = {}
+      for target,src_id in rels:
+        if src_id not in counts:
+          counts[src_id] = {}
+        counts[src_id][target.pk] = 1
+      return [(CountObject(len(targets.keys())),src_id) for src_id,targets in counts.iteritems()]
+    return wrapped
 
 
 class ModelManager(object):
@@ -57,6 +113,11 @@ class ModelManager(object):
     return None
 
   def getattr(self, method):
+    if method.endswith("__count"):
+      method = method[:-7]
+      f = self.getattr(method)
+      return CountObject.count_wrapper(f)
+
     if not hasattr(self.model_class, method):
       raise Exception('Unknown attribute "%s" in "%s"' % (method, self.model_name))
     if not self.is_rel_allowed(method):
@@ -142,3 +203,4 @@ class ModelRegistry(object):
 
 
 model_registry = ModelRegistry()
+model_registry.register(CountObject)

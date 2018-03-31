@@ -112,7 +112,13 @@ def get_related_obj_accessor(rel_obj_descriptor, instance, allow_missing_rel=Fal
 
   def get_related_objects(instances, filters=None):
     queryset = None
-    apply_filters = mk_filter_function(filters)
+
+    # because we can recursively call traverse, after the first call filters
+    # argument is already converted to the result of mk_filter_function
+    if filters is not None and type(filters) == types.FunctionType:
+      apply_filters = filters
+    else:
+      apply_filters = mk_filter_function(filters)
 
     # functioning defining a relationship
     if type(rel_obj_descriptor) in (types.FunctionType, types.MethodType):
