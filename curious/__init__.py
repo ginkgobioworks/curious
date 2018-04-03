@@ -126,12 +126,39 @@ class ModelManager(object):
 
 
 class ModelRegistry(object):
-  def __init__(self):
+
+  def __init__(self, special_models=None):
+    """
+    Create a new model registry
+
+    Optionally determine "special" models that don't get cleared by default.
+
+    Parameters
+    ----------
+    special_models : iterable, optional
+      An iterable of models to register as "special": won't be cleared by a regular call
+      to :meth:`~.clear`
+    """
+    self.__special_models = special_models
     self.clear()
 
-  def clear(self):
+  def clear(self, force=False):
+    """
+    Unregister all models, optionally including special ones
+
+    Parameters
+    ----------
+    force : bool
+      True if special models should also be deleted
+    """
     self.__managers = {}
     self.__short_names = {}
+
+    if force:
+      self.__special_models = None
+    elif self.__special_models is not None:
+      for model in self.__special_models:
+        self.register(model)
 
   def __add_model_by_class(self, cls, short_name=None):
     manager = ModelManager(cls, short_name)
@@ -202,5 +229,4 @@ class ModelRegistry(object):
     return manager.model_name
 
 
-model_registry = ModelRegistry()
-model_registry.register(CountObject)
+model_registry = ModelRegistry(special_models=(CountObject,))
