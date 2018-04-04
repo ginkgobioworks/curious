@@ -1,6 +1,6 @@
 import json
 from django.test import TestCase
-from curious import model_registry
+from curious import model_registry, CountObject
 from curious.api import ModelView
 from curious_tests.models import Blog, Entry, Person
 import curious_tests.models
@@ -68,6 +68,43 @@ class TestQueryAPI(TestCase):
     self.assertEquals(j['result']['results'][1]['join_index'], 0)
     objects = [[obj.id, self.blog.pk] for obj in self.entries]
     self.assertItemsEqual(j['result']['results'][1]['objects'], objects)
+
+  def test_count_query(self):
+    self.maxDiff = None
+    r = self.client.get(
+      '/curious/q/',
+      dict(d=1, q='Blog(%s), Blog.entry_set__count' % self.blog.pk),
+    )
+    self.assertEquals(r.status_code, 200)
+    j = json.loads(r.content)
+    self.assertEquals(j.keys(), ['result'])
+
+    self.assertEquals(j['result']['last_model'], 'CountObject')
+    self.assertEquals(len(j['result']['results']), 2)
+
+    self.assertItemsEqual(
+      j['result']['results'][0].keys(),
+      ['model', 'join_index', 'objects', 'tree'],
+    )
+    self.assertEquals(j['result']['results'][0]['model'], 'Blog')
+    self.assertEquals(j['result']['results'][0]['join_index'], -1)
+    self.assertItemsEqual(j['result']['results'][0]['objects'], [[self.blog.pk, None]])
+
+    self.assertItemsEqual(
+      j['result']['results'][1].keys(),
+      ['model', 'join_index', 'objects', 'tree'],
+    )
+    self.assertEquals(j['result']['results'][1]['model'], 'CountObject')
+    self.assertEquals(j['result']['results'][1]['join_index'], 0)
+    objects = [[self.N, self.blog.pk]]
+    self.assertItemsEqual(j['result']['results'][1]['objects'], objects)
+
+    self.assertItemsEqual(j['result'].keys(), ['last_model', 'results', 'computed_on', 'data'])
+    self.assertEquals(j['result']['data'][0], ModelView.objects_to_dict([self.blog]))
+    self.assertEquals(
+      j['result']['data'][1],
+      json.loads(json.dumps(ModelView.objects_to_dict([CountObject(3)]))),
+    )
 
   def test_getting_data_with_query(self):
     r = self.client.get('/curious/q/', dict(d=1, q='Blog(%s), Blog.entry_set' % self.blog.pk))
