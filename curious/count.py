@@ -1,6 +1,6 @@
 import types
 from collections import defaultdict
-from functools import wraps
+from functools import update_wrapper
 
 from .graph import traverse
 
@@ -95,23 +95,29 @@ class CountObject(object):
     """
     A decorator that turns a regular relationship into a count relationship
 
-    This method is the workhorse of :class:`CountObject`. It takes a typical "relationship function"
-    that gets you from one model to another, and turns it into a "count relationship function" that,
-    instead of returning objects of the next model type, returns virtual :class:`CountObject`
-    instances which hold the number of items that the relationship function would have returned.
+    This method is the workhorse of :class:`CountObject`. It takes a typical relationship (a
+    function or Django model relationship) that gets you from a source model to target model, and
+    turns it into a "count relationship" that, instead of returning objects of the target model
+    type, returns :class:`CountObject` instances hold the _number of items_ of the target model in
+    the relationship. The results, as in the relationship function, are paired in tupples
+    with the primary key of the source object.
 
     Parameters
     ----------
-    relationship : callable
-      A function that takes a list of IDs
+    relationship : callable or Django relationship
+      Either a Django relationship, or a function that takes a list of source objects, and returns a
+      list of tuple pairs of related objects, of the form :samp:`({obj}, {id})`, where `obj` is a
+      related object, and `id` is a primary key for the source object.
 
     Returns
     -------
-    object
-      The object's value of `field_name`.
+    function
+      A count relationship function that takes a list of source model objects and returns a list of
+      tuple pairs of :samp:`({count}, {id})`, where `count` is a :class:`CountObject`, and `id` is
+      the source object primary key.
     """
 
-    def wrapped(objs, filters=None):
+    def wrapper(objs, filters=None):
       rels = traverse(objs, relationship, filters=filters)
 
       # Uniquely count relations, grouped by source object
@@ -124,7 +130,9 @@ class CountObject(object):
         for src_pk, targets in counts.iteritems()
       ]
 
-    if isinstance(relationship, types.FunctionType):
-      wrapped = wraps(relationship)(wrapped)
+    # Update the wrapper to look like the original relationship, if that relationship
+    # is a function
+    if isinstance(relationship, types.FunctionType) or hasattr(relationship, '__name__'):
+      update_wrapper(wrapper, relationship)
 
-    return wrapped
+    return wrapper
