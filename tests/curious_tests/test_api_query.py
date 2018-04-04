@@ -1,6 +1,7 @@
 import json
 from django.test import TestCase
-from curious import model_registry, CountObject
+from curious import model_registry
+from curious.count import CountObject
 from curious.api import ModelView
 from curious_tests.models import Blog, Entry, Person
 import curious_tests.models
