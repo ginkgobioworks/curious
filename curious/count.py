@@ -1,3 +1,4 @@
+import types
 from collections import defaultdict
 from functools import wraps
 
@@ -90,7 +91,7 @@ class CountObject(object):
     return getattr(self, field_name, None)
 
   @staticmethod
-  def count_wrapper(relationship_function):
+  def count_wrapper(relationship):
     """
     A decorator that turns a regular relationship into a count relationship
 
@@ -101,7 +102,7 @@ class CountObject(object):
 
     Parameters
     ----------
-    relationship_function : callable
+    relationship : callable
       A function that takes a list of IDs
 
     Returns
@@ -110,9 +111,8 @@ class CountObject(object):
       The object's value of `field_name`.
     """
 
-    @wraps(relationship_function)
     def wrapped(objs, filters=None):
-      rels = traverse(objs, relationship_function, filters=filters)
+      rels = traverse(objs, relationship, filters=filters)
 
       # Uniquely count relations, grouped by source object
       counts = defaultdict(set)
@@ -123,5 +123,8 @@ class CountObject(object):
         (CountObject(len(targets)), src_pk)
         for src_pk, targets in counts.iteritems()
       ]
+
+    if isinstance(relationship, types.FunctionType):
+      wrapped = wraps(relationship)(wrapped)
 
     return wrapped
