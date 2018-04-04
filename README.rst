@@ -36,7 +36,27 @@ Example
 Query Language
 --------------
 
-avg, sum, max, count. ? modifier for left joins. t modifier for dates.
+The query language allows traversing models by identfying the relationships between them,
+through foreign keys in Django models, or arbitrary id-mapping functions. A Curious query
+is a space-separated set of terms, which connect models together by relationships.
+
+Several kinds of "joins" are possible using these relationship primitives:
+
+- A traditional `inner join` ``Book Book.author_set``
+- A `left outer join`: ``Book.last(10) ?(Book.author_set)``
+- A `recusrive join`: ``Parent.children_*``
+
+Furthermore, at each stage in a join, `filtering` can happen:
+
+- Filtering by `Django field lookups`_: ``Book Book.author_set(id__in=[2,3,4])``
+- Filtering by `subquery`: ``Book +(Book.author_set(id__in=[2,3,4]))``
+- Filtering by `exclusive subquery` ``Book -(Book.author_set(id__in=[2,3,4]))``
+
+Finally, relationships can generate `counts`:
+
+- Counting ``Book Book.author_set__count``
+
+.. _Django field lookups: https://docs.djangoproject.com/en/1.11/ref/models/querysets/#field-lookups
 
 Configuring Curious
 -------------------
