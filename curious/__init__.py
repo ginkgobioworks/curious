@@ -2,6 +2,7 @@ import inspect
 import types
 import django.db.models
 from .graph import _valid_django_rel
+from . import count
 
 
 def deferred_to_real(objs):
@@ -39,10 +40,8 @@ class ModelManager(object):
     self.url_function = None
 
   def is_rel_allowed(self, f):
-    try:
-      rel = getattr(self.model_class, f)
-    except:
-      rel = None
+    rel = getattr(self.model_class, f, None)
+
     if (
       rel
       and _valid_django_rel(getattr(self.model_class, f))
@@ -57,6 +56,11 @@ class ModelManager(object):
     return None
 
   def getattr(self, method):
+    if method.endswith("__count"):
+      method = method[:-7]
+      f = self.getattr(method)
+      return count.CountObject.count_wrapper(f)
+
     if not hasattr(self.model_class, method):
       raise Exception('Unknown attribute "%s" in "%s"' % (method, self.model_name))
     if not self.is_rel_allowed(method):
@@ -65,12 +69,39 @@ class ModelManager(object):
 
 
 class ModelRegistry(object):
-  def __init__(self):
+
+  def __init__(self, special_models=None):
+    """
+    Create a new model registry
+
+    Optionally determine "special" models that don't get cleared by default.
+
+    Parameters
+    ----------
+    special_models : iterable, optional
+      An iterable of models to register as "special": won't be cleared by a regular call
+      to :meth:`~.clear`
+    """
+    self.__special_models = special_models
     self.clear()
 
-  def clear(self):
+  def clear(self, force=False):
+    """
+    Unregister all models, optionally including special ones
+
+    Parameters
+    ----------
+    force : bool
+      True if special models should also be deleted
+    """
     self.__managers = {}
     self.__short_names = {}
+
+    if force:
+      self.__special_models = None
+    elif self.__special_models is not None:
+      for model in self.__special_models:
+        self.register(model)
 
   def __add_model_by_class(self, cls, short_name=None):
     manager = ModelManager(cls, short_name)
@@ -141,4 +172,4 @@ class ModelRegistry(object):
     return manager.model_name
 
 
-model_registry = ModelRegistry()
+model_registry = ModelRegistry(special_models=(count.CountObject,))
