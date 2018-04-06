@@ -115,7 +115,7 @@ def get_related_obj_accessor(rel_obj_descriptor, instance, allow_missing_rel=Fal
 
     # because we can recursively call traverse, after the first call filters
     # argument is already converted to the result of mk_filter_function
-    if filters is not None and type(filters) == types.FunctionType:
+    if callable(filters):
       apply_filters = filters
     else:
       apply_filters = mk_filter_function(filters)
